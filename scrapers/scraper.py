@@ -51,15 +51,9 @@ def fetch_page(url: str, client=None):
 
 def get_listings_from_jsonld(html: str):
     """
-    Try to get listing data from the "hidden" JSON inside the page (JSON-LD).
-
-    Craigslist’s search page is HTML, but inside that HTML they put a
-    <script> tag with id="ld_searchpage_results" that contains the same
-    listings as JSON — like a tidy list the site uses for search engines.
-    This function finds that script, reads the JSON, and turns it into
+    Finds that script, reads the JSON, and turns it into
     a list of listing dicts (title, location, bedrooms, bathrooms).
-    It does NOT get URL or price (those come from the HTML). Returns []
-    if the script is missing or the JSON is invalid.
+    Returns [] if the script is missing or the JSON is invalid.
     """
     soup = BeautifulSoup(html, "html.parser")
     script = soup.find("script", type="application/ld+json", id="ld_searchpage_results")
@@ -86,17 +80,6 @@ def get_listings_from_jsonld(html: str):
 
 
 def get_listings_from_html(html: str):
-    """
-    Get listings by reading the visible HTML structure (BeautifulSoup).
-
-    When the JSON-LD block is missing or we need URLs/prices, we use this:
-    we parse the HTML and look for the same things a human sees — each
-    listing row (.result-row), the title link, the price, the neighborhood.
-    We use CSS-style selectors to find those elements and pull their text
-    or href. Returns a list of dicts with title, url, price, location.
-    Returns [] if the page doesn't use .result-row (then caller can merge
-    JSON-LD with URLs/prices from get_listing_urls_from_html and get_prices_from_html).
-    """
     soup = BeautifulSoup(html, "html.parser")
     rows = soup.select(".result-row")
     if not rows:
@@ -126,11 +109,6 @@ def get_listings_from_html(html: str):
 def get_listing_urls_from_html(html: str):
     """
     Get the list of listing detail URLs from the page, in order.
-
-    We look for links that look like a Craigslist listing page
-    (e.g. /eby/apa/d/berkeley/1234567890.html) and collect them in
-    the order they appear. Used to attach URLs to JSON-LD listings
-    when we don't have .result-row.
     """
     import re
     soup = BeautifulSoup(html, "html.parser")
@@ -148,10 +126,6 @@ def get_listing_urls_from_html(html: str):
 def get_prices_from_html(html: str):
     """
     Get the list of price strings from the page, in order (e.g. "$2,295").
-
-    Craigslist shows price in div.price or span.result-price. We collect
-    all of them in document order so we can match them to listings by
-    index when merging with JSON-LD.
     """
     soup = BeautifulSoup(html, "html.parser")
     els = soup.select("div.price") or soup.select("span.result-price")
@@ -160,15 +134,8 @@ def get_prices_from_html(html: str):
 
 def parse_listings(html: str):
     """
-    Get all listings from one search page: prefer backend-like data, fall back to HTML.
+    Get all listings from one search page.
 
-    Step 1: Try get_listings_from_html. If the page has .result-row, we get
-    full dicts (title, url, price, location) and return them.
-    Step 2: If not, try get_listings_from_jsonld to get title, location,
-    bedrooms, bathrooms from the embedded JSON. Then get_listing_urls_from_html
-    and get_prices_from_html and attach URL and price to each listing by
-    index (first listing gets first URL and first price). Returns one list
-    of dicts with title, url, price, location, bedrooms, bathrooms.
     """
     from_html = get_listings_from_html(html)
     if from_html:
@@ -187,11 +154,6 @@ def parse_listings(html: str):
 def search(query: str = "berkeley", offset: int = 0, delay_seconds: float = 0):
     """
     Run one housing search: build URL, fetch the page, parse listings, return them.
-
-    This is the "do it all" helper: we build the search URL with build_search_url,
-    wait delay_seconds (to be nice to the server), fetch the page with fetch_page,
-    then turn the HTML into a list of listing dicts with parse_listings.
-    Returns that list. Use delay_seconds > 0 when calling many times (e.g. pagination).
     """
     import time
     url = build_search_url(query=query, offset=offset)
